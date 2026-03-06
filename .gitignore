@@ -225,3 +225,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+API_keys.txt
+evaluation*/
+**/__pycache__/
+results*/
