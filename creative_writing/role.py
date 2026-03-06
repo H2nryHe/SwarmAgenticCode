@@ -228,10 +228,16 @@ class Team():
         messages = self.message_pool.messages[1:]
         if len(workflow) == len(messages):
             for i, mes in enumerate(messages):
-                workflow[i]['Result'] = mes.content
-        for step in workflow:
+                if isinstance(workflow[i], dict):
+                    workflow[i]['Result'] = mes.content
+                else:
+                    workflow[i] = {'Role': str(workflow[i]), 'Result': mes.content}
+        for i, step in enumerate(workflow):
+            if not isinstance(step, dict):
+                workflow[i] = {'Role': str(step)}
+                step = workflow[i]
             for role in self.roles:
-                if role.name == step['Role']:
+                if role.name == step.get('Role'):
                     step['Role'] = role.to_dict()
         return workflow
     

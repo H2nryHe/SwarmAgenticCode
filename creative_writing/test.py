@@ -4,9 +4,9 @@ Evaluate a saved particle on test dataset
 """
 
 from langchain_openai import ChatOpenAI
+from func_timeout import func_timeout, FunctionTimedOut
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 import argparse
 import json
@@ -16,6 +16,9 @@ from func import *
 from role import Team
 from logger import setup_logger, log
 from eval import evaluate, get_fitness
+
+LLM_TIMEOUT_SECONDS = 5
+LLM_MAX_RETRIES = 0
 
 
 def execute(team_with_task, data, i, func, llm_eval):
@@ -34,9 +37,34 @@ def execute(team_with_task, data, i, func, llm_eval):
     task_description = f'''Write a coherent passage of 4 short paragraphs. The end sentence of each paragraph must be: {data}'''
     team_with_task.reset_task(task_description)
     
-    res = func(team_with_task)
-    # Evaluation 
-    score, _ = evaluate(llm_eval, task_description, res)
+    try:
+        res = func_timeout(10, func, args=(team_with_task,))
+    except FunctionTimedOut:
+        return {
+            "idx": i,
+            "response": "",
+            "score": 0.0,
+            "error": "function_timeout",
+        }
+    except Exception as e:
+        return {
+            "idx": i,
+            "response": "",
+            "score": 0.0,
+            "error": f"function_error: {e}",
+        }
+
+    # Evaluation
+    try:
+        score, _ = evaluate(llm_eval, task_description, res)
+    except Exception as e:
+        score = 0.0
+        return {
+            "idx": i,
+            "response": res,
+            "score": score,
+            "error": f"eval_error: {e}",
+        }
 
     result = {
         "idx": i,
@@ -70,16 +98,13 @@ async def evaluate_particle(team, func, testset, llm_eval, save_dir,
     
     print(f"Evaluating on indices {start_index} to {end_index} ({end_index - start_index} examples)")
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        loop = asyncio.get_running_loop()
-        tasks = []
-        for i, data in enumerate(testset[start_index:end_index]):
-            team_with_task = team.deepcopy() 
-            tasks.append(loop.run_in_executor(
-                executor, execute, team_with_task, data, i, func, llm_eval
-            ))
-
-        results = await asyncio.gather(*tasks)
+    results = []
+    for i, data in enumerate(testset[start_index:end_index]):
+        team_with_task = team.deepcopy()
+        result = execute(team_with_task, data, i, func, llm_eval)
+        results.append(result)
+        if (i + 1) % 5 == 0:
+            print(f"Progress: {i + 1}/{end_index - start_index}")
 
     # Save results
     result_file = f'{save_dir}/results.jsonl'
@@ -117,8 +142,18 @@ async def main(particle_idx=-1, model='gpt-4o-mini', eval_model='gpt-4o-mini',
     print(f"Loaded {len(testset)} test examples")
     
     # Setup models
-    llm_role = ChatOpenAI(model=model, temperature=0.001)
-    llm_eval = ChatOpenAI(model=eval_model, temperature=0.001)
+    llm_role = ChatOpenAI(
+        model=model,
+        temperature=0.001,
+        timeout=LLM_TIMEOUT_SECONDS,
+        max_retries=LLM_MAX_RETRIES,
+    )
+    llm_eval = ChatOpenAI(
+        model=eval_model,
+        temperature=0.001,
+        timeout=LLM_TIMEOUT_SECONDS,
+        max_retries=LLM_MAX_RETRIES,
+    )
     
     print(f"Using execution model: {model}")
     print(f"Using evaluation model: {eval_model}")

@@ -5,7 +5,7 @@ PSO (Particle Swarm Optimization) for Creative Writing Task
 from langchain_openai import ChatOpenAI
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 
 import argparse
 import copy
@@ -26,6 +26,9 @@ from prompt.best_global import reflect_from_global_best
 from prompt.best_personal import reflect_from_personal_best
 from prompt.feedback_give import give_feedback
 from prompt.feedback_summarize import summarize_feedback
+
+LLM_TIMEOUT_SECONDS = 180
+LLM_MAX_RETRIES = 2
 
 
 class Particle:
@@ -129,7 +132,15 @@ class Particle:
                 team_with_task = team.deepcopy() 
                 tasks.append(loop.run_in_executor(executor, execute, team_with_task, data, evaluations, i, batch_logs))
 
-            results = await asyncio.gather(*tasks)
+            results = []
+            try:
+                for task in asyncio.as_completed(tasks, timeout=900):
+                    try:
+                        results.append(await task)
+                    except Exception as e:
+                        log(self.logger, "Task Error", f"iter={iter}, particle={i_pos}, error={e}")
+            except asyncio.TimeoutError:
+                log(self.logger, "Timeout", f"Particle evaluation timed out at iter={iter}, particle={i_pos}.")
             for logs in batch_logs:
                 log_all(self.logger, logs)
 
@@ -208,7 +219,12 @@ def initialize(settings, llm_role, llm_eval, model, save_dir='results', max_work
     particles = []
     for i, item in enumerate(settings): 
         logger = setup_logger(i)
-        llm = ChatOpenAI(model=model, temperature=item)
+        llm = ChatOpenAI(
+            model=model,
+            temperature=item,
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=LLM_MAX_RETRIES,
+        )
         team = Team(llm=llm_role, logger=logger)
         team.init(llm=llm)
         code = get_forward(llm_eval, logger, team.to_str(), team.workflow) 
@@ -305,8 +321,18 @@ async def main(max_iteration=10, settings=None, model='gpt-4o-mini', max_workers
     global_best_trend = []
 
     # Hyper Parameter
-    llm_role = ChatOpenAI(model=model, temperature=0.001)
-    llm_eval = ChatOpenAI(model=model, temperature=0.001)
+    llm_role = ChatOpenAI(
+        model=model,
+        temperature=0.001,
+        timeout=LLM_TIMEOUT_SECONDS,
+        max_retries=LLM_MAX_RETRIES,
+    )
+    llm_eval = ChatOpenAI(
+        model=model,
+        temperature=0.001,
+        timeout=LLM_TIMEOUT_SECONDS,
+        max_retries=LLM_MAX_RETRIES,
+    )
 
     particles = initialize(settings, llm_role, llm_eval, model, save_dir, max_workers)
 
@@ -327,14 +353,30 @@ async def main(max_iteration=10, settings=None, model='gpt-4o-mini', max_workers
                 velocity_futures = []
                 for p in particles:
                     velocity_futures.append(executor.submit(p.update_velocity, global_best_position))
-                for future in tqdm(as_completed(velocity_futures), desc="Update Velocity", total=len(particles), position=2):
-                    future.result()
+                try:
+                    for future in tqdm(
+                        as_completed(velocity_futures, timeout=600),
+                        desc="Update Velocity",
+                        total=len(particles),
+                        position=2,
+                    ):
+                        future.result()
+                except FuturesTimeoutError:
+                    log(particles[0].logger, "Timeout", "Update Velocity exceeded timeout; continuing.")
 
                 position_futures = []
                 for p in particles:
                     position_futures.append(executor.submit(p.update_position))
-                for future in tqdm(as_completed(position_futures), desc="Update Position", total=len(particles), position=2):
-                    future.result()
+                try:
+                    for future in tqdm(
+                        as_completed(position_futures, timeout=600),
+                        desc="Update Position",
+                        total=len(particles),
+                        position=2,
+                    ):
+                        future.result()
+                except FuturesTimeoutError:
+                    log(particles[0].logger, "Timeout", "Update Position exceeded timeout; continuing.")
 
     save_particles(particles)
     
