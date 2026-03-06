@@ -219,6 +219,11 @@ database/
 
 # OS files
 .DS_Store
+
+# Local secrets and generated outputs
+API_keys.txt
+results*/
+evaluation*/
 Thumbs.db
 
 # IDE settings (vim swap files)

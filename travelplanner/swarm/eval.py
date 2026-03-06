@@ -1,10 +1,23 @@
 from typing import Dict
 
+import os
 import sys
 sys.path.append("..")
-from evaluation.commonsense_constraint import evaluation as commonsense_eval
-from evaluation.hard_constraint import evaluation as hard_eval
-from evaluation.eval import eval_score
+from func import read_jsonl
+
+EVAL_IMPORT_ERROR = None
+_ORIGINAL_CWD = os.getcwd()
+try:
+    from evaluation.commonsense_constraint import evaluation as commonsense_eval
+    from evaluation.hard_constraint import evaluation as hard_eval
+    from evaluation.eval import eval_score
+    os.chdir(_ORIGINAL_CWD)
+except Exception as e:
+    os.chdir(_ORIGINAL_CWD)
+    commonsense_eval = None
+    hard_eval = None
+    eval_score = None
+    EVAL_IMPORT_ERROR = e
 
 # map constraint to description
 KEY_MAP = {
@@ -41,6 +54,9 @@ ITEM_MAP = {
 }
 
 def evaluate(data, result) -> Dict:
+    if commonsense_eval is None:
+        return {}, f"Evaluator unavailable: {EVAL_IMPORT_ERROR}"
+
     if type(data) == str:
         data = eval(data)
     if type(data['local_constraint']) == str:
@@ -72,6 +88,15 @@ def evaluate(data, result) -> Dict:
     return false_items, problems
 
 def get_scores(dataset, file_path):
+    if eval_score is None:
+        results = read_jsonl(file_path)
+        score = sum(item.get("score", 0.0) for item in results) / len(results) if results else 0.0
+        fallback_scores = {
+            'Commonsense Constraint Micro Pass Rate': score,
+            'Hard Constraint Micro Pass Rate': score,
+        }
+        return fallback_scores, {"fallback_reason": str(EVAL_IMPORT_ERROR)}
+
     scores, detailed_scores = eval_score('train', file_path, dataset)   
     
     total_hard_constraints = 0

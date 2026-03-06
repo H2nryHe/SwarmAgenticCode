@@ -297,6 +297,7 @@ async def main(max_iteration=2, settings=None, model='gpt-4o-mini', max_workers=
                 for future in tqdm(as_completed(position_futures), desc="Update Position", total=len(particles), position=2):
                     future.result()
 
+    save_particles(particles)
     save_state(particles, global_best_position, global_best_fitness, global_best_trend)
     
     print(f"\nOptimization completed!")
