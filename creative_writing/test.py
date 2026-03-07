@@ -3,8 +3,6 @@ Testing and Evaluation Script for Creative Writing Task
 Evaluate a saved particle on test dataset
 """
 
-from langchain_openai import ChatOpenAI
-
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
@@ -16,6 +14,7 @@ from func import *
 from role import Team
 from logger import setup_logger, log
 from eval import evaluate, get_fitness
+from llm_utils import build_chat_openai
 
 
 def execute(team_with_task, data, i, func, llm_eval):
@@ -34,16 +33,21 @@ def execute(team_with_task, data, i, func, llm_eval):
     task_description = f'''Write a coherent passage of 4 short paragraphs. The end sentence of each paragraph must be: {data}'''
     team_with_task.reset_task(task_description)
     
-    res = func(team_with_task)
-    # Evaluation 
-    score, _ = evaluate(llm_eval, task_description, res)
-
-    result = {
-        "idx": i,
-        "response": res,
-        "score": score,
-    }
-    return result
+    try:
+        res = func(team_with_task)
+        score, _ = evaluate(llm_eval, None, res)
+        return {
+            "idx": i,
+            "response": res,
+            "score": score,
+        }
+    except Exception as exc:
+        return {
+            "idx": i,
+            "response": "",
+            "score": 0.0,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
 
 
 async def evaluate_particle(team, func, testset, llm_eval, save_dir, 
@@ -117,8 +121,8 @@ async def main(particle_idx=-1, model='gpt-4o-mini', eval_model='gpt-4o-mini',
     print(f"Loaded {len(testset)} test examples")
     
     # Setup models
-    llm_role = ChatOpenAI(model=model, temperature=0.001)
-    llm_eval = ChatOpenAI(model=eval_model, temperature=0.001)
+    llm_role = build_chat_openai(model=model, temperature=0.001)
+    llm_eval = build_chat_openai(model=eval_model, temperature=0.001)
     
     print(f"Using execution model: {model}")
     print(f"Using evaluation model: {eval_model}")

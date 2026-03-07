@@ -2,6 +2,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from pydantic import BaseModel, Field, ConfigDict
 from langchain_core.output_parsers import PydanticOutputParser
+from llm_utils import get_score_runs, invoke_with_retries
 
 # Prompt template for the coherence evaluation task. 
 # Given passage.
@@ -75,14 +76,14 @@ def evaluate(llm, task, response):
         "response": response,
     }
 
-    # Get the average score of 5 runs
+    score_runs = get_score_runs()
     scores = 0
-    for i in range(5):
-        score = chain.invoke(input)
+    for _ in range(score_runs):
+        score = invoke_with_retries(chain, input, description="CW coherence scoring")
         score = score.model_dump(by_alias=True)
         scores += score['score']
     
-    final_score = scores / 5
+    final_score = scores / score_runs
 
     if final_score < 10 and task != None:
         problem_prompt = PromptTemplate(
@@ -93,9 +94,9 @@ def evaluate(llm, task, response):
         input = {
             "task": task,
             "response": response,
-            "score": score
+            "score": final_score
         }
-        problem = chain.invoke(input)
+        problem = invoke_with_retries(chain, input, description="CW problem analysis")
     else:
         problem = ''
     
