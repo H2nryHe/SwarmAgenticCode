@@ -2,8 +2,6 @@
 PSO (Particle Swarm Optimization) for Creative Writing Task
 """
 
-from langchain_openai import ChatOpenAI
-
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -26,6 +24,7 @@ from prompt.best_global import reflect_from_global_best
 from prompt.best_personal import reflect_from_personal_best
 from prompt.feedback_give import give_feedback
 from prompt.feedback_summarize import summarize_feedback
+from llm_utils import build_chat_openai
 
 
 class Particle:
@@ -208,7 +207,7 @@ def initialize(settings, llm_role, llm_eval, model, save_dir='results', max_work
     particles = []
     for i, item in enumerate(settings): 
         logger = setup_logger(i)
-        llm = ChatOpenAI(model=model, temperature=item)
+        llm = build_chat_openai(model=model, temperature=item)
         team = Team(llm=llm_role, logger=logger)
         team.init(llm=llm)
         code = get_forward(llm_eval, logger, team.to_str(), team.workflow) 
@@ -305,8 +304,8 @@ async def main(max_iteration=10, settings=None, model='gpt-4o-mini', max_workers
     global_best_trend = []
 
     # Hyper Parameter
-    llm_role = ChatOpenAI(model=model, temperature=0.001)
-    llm_eval = ChatOpenAI(model=model, temperature=0.001)
+    llm_role = build_chat_openai(model=model, temperature=0.001)
+    llm_eval = build_chat_openai(model=model, temperature=0.001)
 
     particles = initialize(settings, llm_role, llm_eval, model, save_dir, max_workers)
 

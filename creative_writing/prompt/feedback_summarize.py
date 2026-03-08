@@ -1,6 +1,7 @@
 import json
 from logger import log
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the flaw detection.
 # Given feedback(explanation of the problem from feedback_give) and the current team.
@@ -68,7 +69,7 @@ def summarize_feedback(llm, logger, feedback, team):
         "feedback": feedback,
         "team": team
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Summarize feedback")
     
     log_content = '\n'.join(f'{i+1}. {item["flaw type"]}: {item["description"]}' for i, item in enumerate(res["Reflect on Team Flaws"]))
     log(logger, 'Summarize Feedback', prompt.format(**input), log_content)

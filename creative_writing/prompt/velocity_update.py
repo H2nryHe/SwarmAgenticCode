@@ -2,6 +2,7 @@ import json
 from logger import log
 from prompt.base import TASK_MINI
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the velocity update function. 
 # Given the current team, task, and Reflection from their personal best and global best.
@@ -117,7 +118,7 @@ def update_velocity(llm, logger, team, velocity, g_best, p_best):
         "task": TASK_MINI,
         "feedback": combine_input(velocity, g_best, p_best),
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Update velocity")
 
     log_output = '\n'.join(json.dumps(item,indent=4) for item in res["Adjustments"])
     log(logger, 'Update Velocity', prompt.format(**input), log_output)

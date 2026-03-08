@@ -3,6 +3,7 @@ import json
 from logger import log
 from prompt.base import TASK_MINI
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the team update function.
 # Given team, workflow, task, and plan (velocity).
@@ -120,7 +121,7 @@ def update_team(llm, logger, team, workflow, plan):
         "task": TASK_MINI,
         "plan": '\n'.join(f'{i+1}. {item["Proposed Adjustment"]}' for i, item in enumerate(plan))
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Update team")
 
     try:
         lines = re.split(r'(\d+\.\s)', res["workflow"])

@@ -3,6 +3,7 @@ from langchain_core.prompts import PromptTemplate
 
 from logger import log
 from prompt.base import TASK_MINI
+from llm_utils import invoke_with_retries
 
 # Prompt template for the reflection from global best function.
 # Given team, task, flaw, and global best team.
@@ -109,9 +110,9 @@ def reflect_from_global_best(llm, logger, team, evaluation, g_best):
         "feedback": '\n'.join(f'{i+1}. {item["flaw type"]}: {item["description"]}' for i, item in enumerate(evaluation)),
         "g_best": g_best
     }
-    res = chain.invoke(input)  
+    res = invoke_with_retries(chain, input, description="Reflect from global best")
     while len(res["Adjustments"]) != len(evaluation):
-        res = chain.invoke(input)
+        res = invoke_with_retries(chain, input, description="Reflect from global best")
 
     log_output = '\n'.join(json.dumps(item,indent=4) for item in res["Adjustments"])
     log(logger, 'Global Best', prompt.format(**input), log_output) 

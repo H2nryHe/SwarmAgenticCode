@@ -2,6 +2,7 @@ import re
 from logger import log
 from prompt.base import TASK_MINI
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for initializing a team to solve a task
 # Given task.
@@ -108,7 +109,7 @@ def init_team(llm, logger) -> str:
 
     chain = prompt | llm.with_structured_output(schema)
     input = {"task": TASK_MINI}
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Init team")
 
     try:
         lines = re.split(r'(\d+\.\s)', res["workflow"])

@@ -1,6 +1,7 @@
 import json
 from logger import log
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the velocity initialization.
 # Given current team and flaw.
@@ -79,7 +80,7 @@ def initialize_velocity(llm, logger, team, evaluation):
         "feedback": '\n'.join(f'{i+1}. {item["flaw type"]}: {item["description"]}' for i, item in enumerate(evaluation))
 ,
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Initialize velocity")
 
     log_output = '\n'.join(json.dumps(item,indent=4) for item in res["Adjustments"])
     log(logger, 'Initialize Velocity', prompt.format(**input), log_output)

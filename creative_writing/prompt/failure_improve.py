@@ -1,6 +1,7 @@
 import json
 from logger import log
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the failure improvement function.
 # Given team and feedback (identified flaw and failed adjustment).
@@ -84,7 +85,7 @@ def improve_failure(llm, logger, team, failures):
         "team": team,
         "feedback": failures,
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Improve failure")
 
     log_output = '\n'.join(json.dumps(item,indent=4) for item in res["Adjustments"])
     log(logger, 'Improve Failure', prompt.format(**input), log_output)

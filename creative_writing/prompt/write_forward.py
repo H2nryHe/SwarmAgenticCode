@@ -2,6 +2,7 @@ import json
 from logger import log
 from prompt.base import FUNCTION_DESCRIPTION
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the forward function. It creates a text represents a callable function to organize available roles to solve a specific task.
 # Given function description, roles, workflow.
@@ -74,7 +75,7 @@ def build_forward(llm, logger, roles, workflow):
         "workflow": json.dumps(workflow, indent=4), 
         "examples": EXAMPLES
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Write forward")
     log(logger, 'Write Forward', prompt.format(**input), res['code'])
     return res['code']
 

@@ -2,6 +2,7 @@ import json
 from logger import log
 from prompt.base import TASK_MINI
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the reflection from personal best function.
 # Given team, task, flaw, and personal best team.
@@ -109,9 +110,9 @@ def reflect_from_personal_best(llm, logger, team, evaluation, p_best):
         "feedback": '\n'.join(f'{i+1}. {item["flaw type"]}: {item["description"]}' for i, item in enumerate(evaluation)),
         "p_best": p_best
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Reflect from personal best")
     while len(res["Adjustments"]) != len(evaluation):
-        res = chain.invoke(input)
+        res = invoke_with_retries(chain, input, description="Reflect from personal best")
         
     log_output = '\n'.join(json.dumps(item,indent=4) for item in res["Adjustments"])
     log(logger, 'Personal Best', prompt.format(**input), log_output)

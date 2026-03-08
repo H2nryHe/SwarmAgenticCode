@@ -1,6 +1,7 @@
 import json
 from logger import log
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 # Prompt template for the failure identification function. 
 # Given feedback (flaw) and velocity.
@@ -69,9 +70,9 @@ def identify_failure(llm, logger, evaluation, velocity):
         "feedback": '\n'.join(f'{i+1}. {item["flaw type"]}: {item["description"]}' for i, item in enumerate(evaluation)),
         "velocity": json.dumps(velocity, indent=4), 
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, description="Identify failure")
     while len(res["Failed Adjustments"]) != len(evaluation):
-        res = chain.invoke(input)
+        res = invoke_with_retries(chain, input, description="Identify failure")
     
     failed_adjustments = '\n'.join(json.dumps({"Identified Flaw": item["Identified Flaw"], "Failed Adjustment": item["Failed Adjustment"]}, indent=4) for item in res["Failed Adjustments"])
     clean_output = f'''{failed_adjustments}'''

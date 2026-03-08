@@ -198,6 +198,9 @@ cython_debug/
 # Logs and results
 logs/
 results/
+results*/
+evaluation*/
+API_keys.txt
 
 # PSO checkpoints and intermediate data
 save.jsonl

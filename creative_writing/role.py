@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from prompt.team_init import init_team
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from llm_utils import invoke_with_retries
 
 
 ROLE_PROMPT = '''You are {name}. You are working in a team solving the following specific task:
@@ -103,7 +104,7 @@ class Role():
             "information": others_outputs,
             "output": output
         }
-        response = chain.invoke(input)
+        response = invoke_with_retries(chain, input, description=f"Role response: {self.name}")
 
         log = (f'Role - {self.name}', prompt.format(**input), response)
         self.message.content = f'''\n\n## {output.split('.')[0]} from {self.name}: \n{response}\n'''
