@@ -17,6 +17,42 @@ from eval import evaluate, get_fitness
 from llm_utils import build_chat_openai
 
 
+def load_archive_entry(archive_idx):
+    """Load one archive entry from save.jsonl and resolve negative indices."""
+    archives = read_jsonl('save.jsonl')
+    if not archives:
+        return None, None
+
+    resolved_idx = archive_idx if archive_idx >= 0 else len(archives) + archive_idx
+    if resolved_idx < 0 or resolved_idx >= len(archives):
+        return None, None
+
+    return resolved_idx, archives[resolved_idx]['archive']
+
+
+def select_particle(particles, particle_mode):
+    """Select a particle deterministically from one archive entry."""
+    if not particles:
+        return None, None
+
+    if particle_mode == 'best':
+        best_idx = max(range(len(particles)), key=lambda idx: particles[idx].get('score', float('-inf')))
+        return best_idx, particles[best_idx]
+
+    return 0, particles[0]
+
+
+def get_particle_metadata(particle):
+    team_dict = particle['team']
+    roles = [role['Name'] for role in team_dict['roles']]
+    workflow_order = [step['Role'] for step in team_dict['workflow']]
+    return {
+        "archive_score": particle.get('score'),
+        "roles": roles,
+        "workflow_order": workflow_order,
+    }
+
+
 def execute(team_with_task, data, i, func, llm_eval):
     """Execute the team workflow on a single data point.
     
@@ -97,14 +133,15 @@ async def evaluate_particle(team, func, testset, llm_eval, save_dir,
     return fitness
 
 
-async def main(particle_idx=-1, model='gpt-4o-mini', eval_model='gpt-4o-mini',
+async def main(particle_idx=-1, particle_mode='first', model='gpt-4o-mini', eval_model='gpt-4o-mini',
                dataset_path='data/data_100_random_text.jsonl', 
                save_dir='results/test', start_index=5, end_index=None, 
                max_workers=16):
     """Main function to evaluate a particle on test dataset.
     
     Args:
-        particle_idx: Index of particle to load from save.jsonl (default: -1, last particle)
+        particle_idx: Archive entry index to load from save.jsonl (default: -1, last archive entry)
+        particle_mode: Which particle to evaluate from the selected archive entry
         model: Model to use for team execution
         eval_model: Model to use for evaluation
         dataset_path: Path to test dataset file
@@ -130,19 +167,33 @@ async def main(particle_idx=-1, model='gpt-4o-mini', eval_model='gpt-4o-mini',
     # Load particle
     logger = setup_logger(9)
     team = Team(llm_role, logger)
-    particles = load_particles(particle_idx)
+    resolved_archive_idx, particles = load_archive_entry(particle_idx)
     
     if not particles:
-        print(f"Error: No particles found at index {particle_idx}")
+        print(f"Error: No archive entry found at index {particle_idx}")
         return
-    
-    team_dict = particles[0]['team']
-    code = particles[0]['code']
+
+    selected_particle_idx, selected_particle = select_particle(particles, particle_mode)
+    metadata = get_particle_metadata(selected_particle)
+
+    team_dict = selected_particle['team']
+    code = selected_particle['code']
     team.update(team_dict)
     func = set_forward(code)
-    
-    log(logger, f'Particle {particle_idx}', f'''{team}\n\n{code}''')
-    print(f"Loaded particle {particle_idx}")
+
+    selection_summary = {
+        "selected_archive_entry_index": resolved_archive_idx,
+        "selected_particle_mode": particle_mode,
+        "selected_particle_index": selected_particle_idx,
+        "selected_particle_archive_score": metadata["archive_score"],
+        "selected_particle_roles": metadata["roles"],
+        "selected_workflow_order": metadata["workflow_order"],
+    }
+
+    print(json.dumps(selection_summary, indent=2))
+    log(logger, 'Particle Selection', json.dumps(selection_summary, indent=2))
+    log(logger, f'Particle archive {resolved_archive_idx} member {selected_particle_idx}', f'''{team}\n\n{code}''')
+    print(f"Loaded archive entry {resolved_archive_idx}, particle {selected_particle_idx} ({particle_mode})")
     
     # Run evaluation
     await evaluate_particle(
@@ -154,7 +205,9 @@ async def main(particle_idx=-1, model='gpt-4o-mini', eval_model='gpt-4o-mini',
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Evaluate a saved particle on test dataset')
     parser.add_argument('--particle_idx', type=int, default=-1,
-                        help='Index of particle to load from save.jsonl (default: -1, last particle)')
+                        help='Archive entry index to load from save.jsonl (default: -1, last archive entry)')
+    parser.add_argument('--particle_mode', type=str, default='first', choices=['first', 'best'],
+                        help='Which particle to evaluate from the selected archive entry (default: first)')
     parser.add_argument('--model', type=str, default='gpt-4o-mini',
                         help='Model to use for team execution (default: gpt-4o-mini)')
     parser.add_argument('--eval_model', type=str, default='gpt-4o-mini',
@@ -175,6 +228,7 @@ if __name__ == "__main__":
     
     asyncio.run(main(
         particle_idx=args.particle_idx,
+        particle_mode=args.particle_mode,
         model=args.model,
         eval_model=args.eval_model,
         dataset_path=args.dataset,
