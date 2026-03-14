@@ -2,6 +2,7 @@ import json
 from logger import log
 from prompt.base import FUNCTION_DESCRIPTION
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 
 BASE = """You are an expert python programmer. 
@@ -71,7 +72,7 @@ def build_forward(llm, logger, roles, workflow):
         "workflow": json.dumps(workflow, indent=4), 
         "examples": EXAMPLES
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, "Generate forward function")
     log(logger, 'Write Forward', prompt.format(**input), res['code'])
     return res['code']
 

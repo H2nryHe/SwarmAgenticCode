@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from prompt.base import TASK_NOTICE
 from prompt.team_init import init_team
+from llm_utils import invoke_with_retries
 
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -102,7 +103,7 @@ class Role():
             "information": others_outputs,
             "output": output
         }
-        response = chain.invoke(input)
+        response = invoke_with_retries(chain, input, f"Role response for {self.name}")
 
         log = (f'Role - {self.name}', prompt.format(**input), response)
         self.message.content = f'''\n\n## {output.split('.')[0]} from {self.name}: \n{response}\n'''

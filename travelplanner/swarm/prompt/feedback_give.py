@@ -1,6 +1,7 @@
 import json
 from logger import log
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 
 FEEDBACK_TEMPLATE = '''You are an expert assistant.
@@ -51,7 +52,7 @@ def give_feedback(llm, logger, task, workflow, evaluation):
         "workflow": json.dumps(workflow, indent=2),
         "evaluation": evaluation,
     }
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, "Generate feedback")
 
     log(logger, 'Give Feedback', prompt.format(**input), res["explanation"])
     return res["explanation"]

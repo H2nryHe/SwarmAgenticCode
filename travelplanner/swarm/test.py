@@ -10,6 +10,7 @@ from func import *
 from role import Team
 from logger import setup_logger, log, log_all
 from eval import evaluate, get_scores
+from llm_utils import build_chat_openai
 
 
 def execute(team_with_task, data, ref_info, i, func, llm_extract):
@@ -138,8 +139,8 @@ async def main(particle_idx=-1, model='gpt-4o-mini', save_dir='evaluation/test',
     logger = setup_logger(particle_idx)
     
     # Initialize LLMs
-    llm_role = ChatOpenAI(model=model, temperature=0.001)
-    llm_extract = ChatOpenAI(model="gpt-4o-mini")  # Fixed model for extraction
+    llm_role = build_chat_openai(model=model, temperature=0.001)
+    llm_extract = build_chat_openai(model="gpt-4o-mini", temperature=0.001)
     
     # Load particle
     try:
@@ -190,7 +191,8 @@ async def main(particle_idx=-1, model='gpt-4o-mini', save_dir='evaluation/test',
     # Calculate detailed scores
     result_path = os.path.join(save_dir, 'results.jsonl')
     print("\nCalculating detailed scores...")
-    s1, s2 = get_scores(testset, result_path)
+    score_dataset = testset[start_index:end_index]
+    s1, s2 = get_scores(score_dataset, result_path)
     print(f"\nCommonsense Constraint Pass Rate: {s1}")
     print(f"Hard Constraint Pass Rate: {s2}")
 

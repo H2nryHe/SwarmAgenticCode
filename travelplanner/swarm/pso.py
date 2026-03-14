@@ -16,6 +16,7 @@ from func import *
 from role import Team
 from logger import setup_logger, log, log_all
 from eval import evaluate, get_scores
+from llm_utils import build_chat_openai
 
 from prompt.team_update import update_team
 from prompt.velocity_init import initialize_velocity
@@ -157,7 +158,7 @@ def initialize(settings, llm_role, llm_eval, model, save_dir='evaluation', max_w
     particles = []
     for i, item in enumerate(settings): 
         logger = setup_logger(i)
-        llm = ChatOpenAI(model=model, temperature=item)
+        llm = build_chat_openai(model=model, temperature=item)
         team = Team(llm=llm_role, logger=logger)
         team.init(llm=llm)
         code = get_forward(llm_eval, logger, team.to_str(), team.workflow) 
@@ -257,8 +258,8 @@ async def main(max_iteration=2, settings=None, model='gpt-4o-mini', max_workers=
         settings = [0.2, 0.4, 0.6, 0.8, 1.0]
 
     # Hyper Parameter
-    llm_role = ChatOpenAI(model=model, temperature=0.001)
-    llm_eval = ChatOpenAI(model=model, temperature=0.001)
+    llm_role = build_chat_openai(model=model, temperature=0.001)
+    llm_eval = build_chat_openai(model=model, temperature=0.001)
 
     if resume_from_state:
         particles, global_best_position, global_best_fitness, global_best_trend = initialize_with_state(

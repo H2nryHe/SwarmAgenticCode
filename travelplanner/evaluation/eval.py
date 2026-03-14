@@ -1,10 +1,14 @@
 import os, sys
-sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..")))
-from commonsense_constraint import evaluation as commonsense_eval
-from hard_constraint import evaluation as hard_eval
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+if PARENT_DIR not in sys.path:
+    sys.path.append(PARENT_DIR)
+
+from evaluation.commonsense_constraint import evaluation as commonsense_eval
+from evaluation.hard_constraint import evaluation as hard_eval
 import json
 from tqdm import tqdm
-from datasets import load_dataset
 import argparse
 
 

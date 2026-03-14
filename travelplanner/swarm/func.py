@@ -4,6 +4,7 @@ from langchain_core.prompts import PromptTemplate
 
 from prompt.base import TASK_OUTPUT_SCHEMA
 from prompt.write_forward import build_forward
+from llm_utils import invoke_with_retries
 
 # If an attraction comes with its own City field, use that value verbatim for the city part of the “Name, City;” pair — do not infer or correct it from the address or your own knowledge. For example, output “Seattle Aquarium, Washington;” because its City field is “Washington,” even though the address shows Seattle.
 EXTRACT_PALN_TEMPLATE = """
@@ -145,7 +146,7 @@ def extract_plan(llm, result):
     )
     chain = prompt | llm.with_structured_output(TASK_OUTPUT_SCHEMA)
     input = {"result": result}
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, "Extract travel plan")
     raw_plan = json.dumps(res, indent=4)
     checked_plan = check_format(res['travel_plan'])
     

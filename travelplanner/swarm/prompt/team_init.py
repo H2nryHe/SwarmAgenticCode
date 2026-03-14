@@ -2,6 +2,7 @@ import re
 from logger import log
 from prompt.base import TASK_MINI
 from langchain_core.prompts import PromptTemplate
+from llm_utils import invoke_with_retries
 
 
 INIT_TEAM_TEMPLATE = '''You are an expert in designing a highly efficient, specialized, and collaborative multi-agent team for a specific task.
@@ -104,7 +105,7 @@ def init_team(llm, logger) -> str:
 
     chain = prompt | llm.with_structured_output(schema)
     input = {"task": TASK_MINI}
-    res = chain.invoke(input)
+    res = invoke_with_retries(chain, input, "Initialize team")
 
     try:
         lines = re.split(r'(\d+\.\s)', res["workflow"])
